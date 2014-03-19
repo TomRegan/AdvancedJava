@@ -1,4 +1,4 @@
-# java training
+# Day 1
 
 ## Terminology
 
@@ -6,13 +6,17 @@ OOP - Ordinary Object Pointer ... pointer in the C/C++ sense
 
 ## command line tools
 
-CLI tools have the benefit of running locally. VisualVM etc use jmx which can be difficult to use in a firewalled setting.
+CLI tools have the benefit of being able to run locally. VisualVM etc use jmx which can be difficult to use in a firewalled setting.
 
-### jmap - use to snapshot memory usage; there aren't likely to be any domain objects in the top 10, so that may indicate a memory leak.
+### jmap
+
+Use to snapshot memory usage; there aren't likely to be any domain objects in the top 10, so that may indicate a memory leak.
 
 <> == things which are in PermGen
 
-### jstack - use to spot lock contention; don't snapshot more that once every 100ms or the snapshotting will affect the running application.
+### jstack
+
+Use to spot lock contention; don't snapshot more that once every 100ms or the snapshotting will affect the running application.
 
 threads in BLOCKED which are locked on the same monitor may be deadlocked.
 
@@ -173,3 +177,126 @@ See the source at hotspot/src/share/vm/oops
 More info on perm gen changes (removal of perm gen) by searching under the subject 'meta space'. (Downside, there's a lack of good tooling for native memory analysis).
 
 Class loading is a significant bottleneck, next to GC.
+
+# Day 2
+
+## Java concurrency
+
+2 different concurrency mechanisms
+
+* java.util.concurrent - not dependent on OS
+* Concurrency - heavily dependent on OS features
+
+## Values
+
+Java has no equivalent to pointer arithmetic; mamory is not layed out in a detailed low level way.
+
+* privative values - cannot be mutated
+* reference values - the object can be altered
+
+Java is pass by value, the value is a copy of the object reference (C++ &ref). This is pretty clear if you try to change the pointer as a side effect.
+
+## Terminology
+
+* live - concurrent task making progress towards a new state, cf deadlocked
+* concurrent - two or more tasks
+* parallel - live concurrent tasks
+
+## Type safety
+
+Code which prevents inconsistant state from being seen is 'concurrently type safe'.
+
+* Shared, visible mutable state - 
+* Preemptive thread scheduling - can be stopped at any time
+* Locking
+
+Threads have
+
+* stack
+* copies of registers including pc
+
+threads share
+
+* virtual address space
+
+A thread has its own view of how execution is happening, but shares memory.
+
+* context switch requires a flush of the memory tables.
+* lightweight context switch only requires registers to be swapped out.
+
+Threads can be suspended at any safe point.
+
+### Synchronized
+
+Modifications by code outsite a synchronized block will see the inconsistent state - synchronized is fragile.
+
+Synchronized means memory is read at the start of the block, and write back occurrs at the end of the block.
+
+Synchronized means all threads have the same view of memory.
+
+Static synchronised methods lock the class object.
+
+MuClass.class - locks all instances of base class and derrived classes
+MyClass.getClass() - locks all instances of the specified class
+
+Java locks are reentrant - if a lock is held, it is possible to pass a block which depends on the same lock.
+
+### Volatile
+
+Without vollatile there's no determinism about when a change to a value is visible to other tasks. Volatile flushes caches, causing a cache miss and a view of the updated value. ie. it is possible that an update in one thread doesn't propagate out of the cache for some amount of time.
+
+Provides an edge with a happens before relationship.
+
+* read from memory
+* modify
+* write to memory
+
+Any modification to a volatile value is seen by all threads. There is no guarantee that the updates to the volatile value will not be inconsistant if they are not all synchronised.
+
+### The builder pattern
+
+* create copies
+* return immutable objects
+
+Using mutable objects as keys in a hash map is a bad idea as a key. Altering the mutable values can cause the hash code to perform differently, and may be lost inside the map.
+
+## Threads
+
+Naming threads with setName() - good idea!
+
+stop, suspend resume countStackFrames destroy - are all dreadful, dreadful methods that will cause deadlocks and inconssitant state.
+
+### Avoiding deadlocks
+
+* acquire all the locks in the same order
+* Concurrency has Lock strategies
+
+## JMM
+
+* 'happens before' defines a transitive edge between two tasks
+
+CopyOnWriteArrayList
+
+* we do an add - creates a happens before edge
+* a get - we are guaranteed there is a happens before edge before this
+
+## java.util.concurrent
+
+### Lock
+
+j.u.c doesn't use kernal locks
+
+## Streams
+
+There is (almost) no computation when methods are called on a stream. Computation is done when the pipeline is terminated, eg. by collect().
+
+Stream's parallel friend is the parallelStream method, eg
+Collection::stream -> Collection::parallelStream()
+
+## Loose ends
+
+Strings are mutable - the hash code is constructed on demand to avoid the need for a possibly unused linear scan of the string. This makes string state very difficult to reason about.
+
+Effective Java recommendation
+
+Sizing a threadpool - 2 n CPU as an initial value
